@@ -4,7 +4,7 @@ on:
   schedule:
     # Nightly at 03:17 UTC
     - cron: "17 3 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 concurrency:
   group: sync-upstream-${{ github.workflow }}-${{ github.ref }}
