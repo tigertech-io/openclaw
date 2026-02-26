@@ -1,0 +1,103 @@
+name: Sync upstream (nightly)
+
+on:
+  schedule:
+    # Nightly at 03:17 UTC
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-upstream-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Configure git author
+        run: |
+          set -euo pipefail
+          git config user.name "openclaw-sync-bot"
+          git config user.email "openclaw-sync-bot@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: |
+          set -euo pipefail
+          git remote add upstream https://github.com/openclaw/openclaw.git 2>/dev/null || true
+          git remote -v
+
+      - name: Fetch upstream branches + tags
+        run: |
+          set -euo pipefail
+          git fetch upstream --prune --tags --force
+
+      - name: Sync tags to origin (force-update)
+        run: |
+          set -euo pipefail
+          git push origin --tags --force
+
+      - name: Sync default branch (fast-forward only; PR fallback)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DEFAULT_BRANCH}" ]; then
+            echo "ERROR: DEFAULT_BRANCH is empty"
+            exit 1
+          fi
+
+          echo "Default branch: ${DEFAULT_BRANCH}"
+
+          # Ensure we start from origin/<default>
+          git checkout "${DEFAULT_BRANCH}"
+          git fetch origin "${DEFAULT_BRANCH}"
+          git reset --hard "origin/${DEFAULT_BRANCH}"
+
+          # Try to fast-forward to upstream
+          if git merge --ff-only "upstream/${DEFAULT_BRANCH}"; then
+            echo "Fast-forward succeeded; pushing ${DEFAULT_BRANCH}."
+            git push origin "${DEFAULT_BRANCH}"
+            exit 0
+          fi
+
+          echo "Fast-forward not possible; preparing PR."
+
+          sync_branch="sync/upstream-$(date -u +%Y%m%d)"
+          git checkout -B "${sync_branch}" "origin/${DEFAULT_BRANCH}"
+
+          # Create a merge commit that brings upstream into the fork (Sync fork-like behavior)
+          if ! git merge --no-ff --no-edit "upstream/${DEFAULT_BRANCH}"; then
+            echo "ERROR: Merge conflicts encountered. Manual resolution required."
+            git merge --abort || true
+            exit 1
+          fi
+
+          git push -u origin "${sync_branch}"
+
+          # Create or update PR
+          title="chore(sync): merge upstream/${DEFAULT_BRANCH} into ${DEFAULT_BRANCH}"
+          body=$'## Summary\n- Nightly upstream sync workflow created this PR because a fast-forward update was not possible.\n\n## Notes\n- Tags are synced separately and may be force-updated to match upstream.\n'
+
+          if gh pr view --repo "${REPO}" "${sync_branch}" >/dev/null 2>&1; then
+            echo "PR already exists for ${sync_branch}."
+          else
+            gh pr create \
+              --repo "${REPO}" \
+              --base "${DEFAULT_BRANCH}" \
+              --head "${sync_branch}" \
+              --title "${title}" \
+              --body "${body}"
+          fi

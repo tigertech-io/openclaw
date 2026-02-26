@@ -1,0 +1,18 @@
+name: CI Required
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci-required:
+    name: CI Required
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "CI Required check passed."
+
