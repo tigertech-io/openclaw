@@ -91,12 +91,12 @@ jobs:
           title="chore(sync): merge upstream/${DEFAULT_BRANCH} into ${DEFAULT_BRANCH}"
           body=$(
             cat <<'EOF'
-## Summary
-- Nightly upstream sync workflow created this PR because a fast-forward update was not possible.
+          ## Summary
+          - Nightly upstream sync workflow created this PR because a fast-forward update was not possible.
 
-## Notes
-- Tags are synced separately and may be force-updated to match upstream.
-EOF
+          ## Notes
+          - Tags are synced separately and may be force-updated to match upstream.
+          EOF
           )
 
           if gh pr view --repo "${REPO}" "${sync_branch}" >/dev/null 2>&1; then
