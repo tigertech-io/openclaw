@@ -89,15 +89,7 @@ jobs:
 
           # Create or update PR
           title="chore(sync): merge upstream/${DEFAULT_BRANCH} into ${DEFAULT_BRANCH}"
-          body=$(
-            cat <<'EOF'
-          ## Summary
-          - Nightly upstream sync workflow created this PR because a fast-forward update was not possible.
-
-          ## Notes
-          - Tags are synced separately and may be force-updated to match upstream.
-          EOF
-          )
+          body=$'## Summary\n- Nightly upstream sync workflow created this PR because a fast-forward update was not possible.\n\n## Notes\n- Tags are synced separately and may be force-updated to match upstream.\n'
 
           if gh pr view --repo "${REPO}" "${sync_branch}" >/dev/null 2>&1; then
             echo "PR already exists for ${sync_branch}."
